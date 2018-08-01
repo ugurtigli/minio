@@ -71,7 +71,7 @@ func TestErasureCreateFile(t *testing.T) {
 			t.Fatalf("Test %d: failed to create test setup: %v", i, err)
 		}
 		disks := setup.disks
-		storage, err := NewErasureStorage(context.Background(), test.dataBlocks, test.onDisks-test.dataBlocks, test.blocksize)
+		erasure, err := NewErasure(context.Background(), test.dataBlocks, test.onDisks-test.dataBlocks, test.blocksize)
 		if err != nil {
 			setup.Remove()
 			t.Fatalf("Test %d: failed to create ErasureStorage: %v", i, err)
@@ -90,7 +90,7 @@ func TestErasureCreateFile(t *testing.T) {
 			}
 			writers[i] = newBitrotWriter(disk, "testbucket", "object", test.algorithm)
 		}
-		n, err := storage.CreateFile(context.Background(), bytes.NewReader(data[test.offset:]), writers, buffer, storage.dataBlocks+1)
+		n, err := erasure.Encode(context.Background(), bytes.NewReader(data[test.offset:]), writers, buffer, erasure.dataBlocks+1)
 		if err != nil && !test.shouldFail {
 			t.Errorf("Test %d: should pass but failed with: %v", i, err)
 		}
@@ -119,7 +119,7 @@ func TestErasureCreateFile(t *testing.T) {
 			if test.offDisks > 0 {
 				writers[0] = nil
 			}
-			n, err = storage.CreateFile(context.Background(), bytes.NewReader(data[test.offset:]), writers, buffer, storage.dataBlocks+1)
+			n, err = erasure.Encode(context.Background(), bytes.NewReader(data[test.offset:]), writers, buffer, erasure.dataBlocks+1)
 			if err != nil && !test.shouldFailQuorum {
 				t.Errorf("Test %d: should pass but failed with: %v", i, err)
 			}
@@ -144,7 +144,7 @@ func benchmarkErasureWrite(data, parity, dataDown, parityDown int, size int64, b
 		b.Fatalf("failed to create test setup: %v", err)
 	}
 	defer setup.Remove()
-	storage, err := NewErasureStorage(context.Background(), data, parity, blockSizeV1)
+	erasure, err := NewErasure(context.Background(), data, parity, blockSizeV1)
 	if err != nil {
 		b.Fatalf("failed to create ErasureStorage: %v", err)
 	}
@@ -170,7 +170,7 @@ func benchmarkErasureWrite(data, parity, dataDown, parityDown int, size int64, b
 			}
 			writers[i] = newBitrotWriter(disk, "testbucket", "object", DefaultBitrotAlgorithm)
 		}
-		_, err := storage.CreateFile(context.Background(), bytes.NewReader(content), writers, buffer, storage.dataBlocks+1)
+		_, err := erasure.Encode(context.Background(), bytes.NewReader(content), writers, buffer, erasure.dataBlocks+1)
 		if err != nil {
 			panic(err)
 		}
