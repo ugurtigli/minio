@@ -19,6 +19,7 @@ package cmd
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"sync"
@@ -175,11 +176,11 @@ func (client *RPCClient) setRetryTicker(ticker *time.Ticker) {
 	client.retryTicker = ticker
 }
 
-// Call - calls servicemethod on remote server.
-func (client *RPCClient) Call(serviceMethod string, args interface {
+// CallWith - calls servicemethod on remote server with reader.
+func (client *RPCClient) CallWith(serviceMethod string, args interface {
 	SetAuthArgs(args AuthArgs)
-}, reply interface{}) (err error) {
-	lockedCall := func() error {
+}, reader io.Reader, reply interface{}) (body io.ReadCloser, err error) {
+	lockedCall := func() (io.ReadCloser, error) {
 		client.RLock()
 		defer client.RUnlock()
 
@@ -187,20 +188,20 @@ func (client *RPCClient) Call(serviceMethod string, args interface {
 			select {
 			case <-client.retryTicker.C:
 			default:
-				return errRPCRetry
+				return nil, errRPCRetry
 			}
 		}
 
 		// Make RPC call.
 		args.SetAuthArgs(AuthArgs{client.authToken, client.args.RPCVersion, time.Now().UTC()})
-		return client.rpcClient.Call(serviceMethod, args, reply)
+		return client.rpcClient.Call(serviceMethod, args, reader, reply)
 	}
 
-	call := func() error {
-		err = lockedCall()
+	call := func() (io.ReadCloser, error) {
+		body, err = lockedCall()
 
 		if err == errRPCRetry {
-			return err
+			return nil, err
 		}
 
 		if isNetError(err) {
@@ -209,22 +210,34 @@ func (client *RPCClient) Call(serviceMethod string, args interface {
 			client.setRetryTicker(nil)
 		}
 
-		return err
+		return body, err
 	}
 
 	// If authentication error is received, retry the same call only once
 	// with new authentication token.
-	if err = call(); err == nil {
-		return nil
+	if body, err = call(); err == nil {
+		return body, nil
 	}
 	if err.Error() != errAuthentication.Error() {
-		return err
+		return nil, err
 	}
 
 	client.Lock()
 	client.authToken = client.args.NewAuthTokenFunc()
 	client.Unlock()
 	return call()
+}
+
+// Call - calls servicemethod on remote server.
+func (client *RPCClient) Call(serviceMethod string, args interface {
+	SetAuthArgs(args AuthArgs)
+}, reply interface{}) (err error) {
+	body, err := client.CallWith(serviceMethod, args, nil, reply)
+	if body != nil {
+		body.Close()
+	}
+
+	return err
 }
 
 // Close - closes underneath RPC client.

@@ -62,7 +62,11 @@ func TestClientCall(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		err := rpcClient.Call(testCase.serviceMethod, testCase.args, testCase.reply)
+		body, err := rpcClient.Call(testCase.serviceMethod, testCase.args, nil, testCase.reply)
+		if body != nil {
+			body.Close()
+		}
+
 		expectErr := (err != nil)
 
 		if expectErr != testCase.expectErr {
