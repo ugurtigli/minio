@@ -52,11 +52,11 @@ func TestErasureDecode(t *testing.T) {
 		buffer := make([]byte, len(data), 2*len(data))
 		copy(buffer, data)
 
-		storage, err := NewErasureStorage(context.Background(), test.dataBlocks, test.parityBlocks, blockSizeV1)
+		storage, err := NewErasure(context.Background(), test.dataBlocks, test.parityBlocks, blockSizeV1)
 		if err != nil {
 			t.Fatalf("Test %d: failed to create erasure storage: %v", i, err)
 		}
-		encoded, err := storage.ErasureEncode(context.Background(), buffer)
+		encoded, err := storage.EncodeData(context.Background(), buffer)
 		if err != nil {
 			t.Fatalf("Test %d: failed to encode data: %v", i, err)
 		}
@@ -69,9 +69,9 @@ func TestErasureDecode(t *testing.T) {
 		}
 
 		if test.reconstructParity {
-			err = storage.ErasureDecodeDataAndParityBlocks(context.Background(), encoded)
+			err = storage.DecodeDataAndParityBlocks(context.Background(), encoded)
 		} else {
-			err = storage.ErasureDecodeDataBlocks(encoded)
+			err = storage.DecodeDataBlocks(encoded)
 		}
 
 		if err == nil && test.shouldFail {
