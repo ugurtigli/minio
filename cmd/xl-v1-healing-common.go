@@ -182,8 +182,8 @@ func disksWithAllParts(ctx context.Context, onlineDisks []StorageAPI, partsMetad
 
 			// verification happens even if a 0-length
 			// buffer is passed
-			_, hErr := onlineDisk.ReadFile(bucket, partPath, 0, buffer, verifier)
-
+			// _, hErr := onlineDisk.ReadFile(bucket, partPath, 0, buffer, verifier)
+			_, hErr := onlineDisk.ReadFile(bucket, partPath, 0, verifier)
 			isCorrupt := false
 			if hErr != nil {
 				isCorrupt = strings.HasPrefix(hErr.Error(), "Bitrot verification mismatch - expected ")

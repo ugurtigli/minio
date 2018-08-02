@@ -38,7 +38,8 @@ type StorageAPI interface {
 
 	// File operations.
 	ListDir(volume, dirPath string, count int) ([]string, error)
-	ReadFile(volume string, path string, offset int64, buf []byte, verifier *BitrotVerifier) (n int64, err error)
+	// ReadFile(volume string, path string, offset int64, buf []byte, verifier *BitrotVerifier) (n int64, err error)
+	ReadFile(volume, path string, offset int64, verifier *BitrotVerifier) (io.Reader, error)
 	PrepareFile(volume string, path string, len int64) (err error)
 	AppendFile(volume string, path string, buf []byte) (err error)
 	RenameFile(srcVolume, srcPath, dstVolume, dstPath string) error

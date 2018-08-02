@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"hash"
+	"io"
 
 	"github.com/minio/highwayhash"
 	"github.com/minio/minio/cmd/logger"
@@ -116,7 +117,7 @@ type bitrotReader struct {
 	filePath  string
 	verifier  *BitrotVerifier // Holds the bit-rot info
 	endOffset int64           // Affects the length of data requested in disk.ReadFile depending on Read()'s offset
-	buf       []byte          // Holds bit-rot verified data
+	reader    io.Reader
 }
 
 // newBitrotReader returns bitrotReader.
@@ -129,26 +130,32 @@ func newBitrotReader(disk StorageAPI, volume, filePath string, algo BitrotAlgori
 		filePath:  filePath,
 		verifier:  &BitrotVerifier{algo, sum},
 		endOffset: endOffset,
-		buf:       nil,
+		reader:    nil,
 	}
 }
 
 // ReadChunk returns requested data.
 func (b *bitrotReader) ReadChunk(offset int64, length int64) ([]byte, error) {
-	if b.buf == nil {
-		b.buf = make([]byte, b.endOffset-offset)
-		if _, err := b.disk.ReadFile(b.volume, b.filePath, offset, b.buf, b.verifier); err != nil {
+	var err error
+	if b.reader == nil {
+		b.reader, err = b.disk.ReadFile(b.volume, b.filePath, offset, b.verifier)
+		if err != nil {
 			logger.LogIf(context.Background(), err)
 			return nil, err
 		}
 	}
-	if int64(len(b.buf)) < length {
-		logger.LogIf(context.Background(), errLessData)
+	buf := make([]byte, length)
+	n, err := b.reader.Read(buf)
+	if err == io.EOF {
+		err = nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if n != length {
 		return nil, errLessData
 	}
-	retBuf := b.buf[:length]
-	b.buf = b.buf[length:]
-	return retBuf, nil
+	return buf, nil
 }
 
 // To calculate the bit-rot of the written data.
